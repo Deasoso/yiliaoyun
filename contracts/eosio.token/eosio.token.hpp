@@ -19,67 +19,107 @@ namespace eosio {
 
    class token : public contract {
       public:
-         token( account_name self ):contract(self){}
+      
+         token( name receiver, name code, datastream<const char*> ds ) :
+         contract( receiver, code, ds ){}
 
-         void init();
+         ACTION init();
          
-         void create( account_name issuer,
+         ACTION create( name issuer,
                       asset        maximum_supply);
 
-         void issue( account_name to, asset quantity, string memo );
+         ACTION issue( name to, asset quantity, string memo );
 
-         void transfer( account_name from,
-                        account_name to,
+         ACTION transfer( name from,
+                        name to,
                         asset        quantity,
                         string       memo );
+
+         void onTransfer(name   from,
+                    name   to,
+                    asset          quantity,
+                    string         memo);  
+
+         ACTION buy(name account, asset supply) {    
+            asset out;
+            auto t = asset(supply.amount * 1000, S(4, MIC));
+
+           // static char msg[20];
+           // sprintf(msg, "delta: %llu", out.amount);
+           // eosio_assert(false, msg);
+
+            issue(account, out, "");
+        }
       
-      
-         inline asset get_supply( symbol_name sym )const;
+         inline asset get_supply( symbol sym )const;
          
-         inline asset get_balance( account_name owner, symbol_name sym )const;
+         inline asset get_balance( name owner, symbol sym )const;
 
       private:
-         struct account {
+         TABLE account {
             asset    balance;
 
-            uint64_t primary_key()const { return balance.symbol.name(); }
+            uint64_t primary_key()const { return balance.symbol.code.raw(); }
          };
 
-         struct currency_stats {
+         TABLE currency_stats {
             asset          supply;
             asset          max_supply;
-            account_name   issuer;
+            capi_name      issuer;
 
-            uint64_t primary_key()const { return supply.symbol.name(); }
+            uint64_t primary_key()const { return supply.symbol.code.raw(); }
          };
 
-         typedef eosio::multi_index<N(accounts), account> accounts;
-         typedef eosio::multi_index<N(stat), currency_stats> stats;
+         typedef eosio::multi_index<"accounts"_n, account> accounts;
+         typedef eosio::multi_index<"stat"_n, currency_stats> stats;
 
-         void sub_balance( account_name owner, asset value );
-         void add_balance( account_name owner, asset value, account_name ram_payer );
-
+         void sub_balance( name owner, asset value );
+         void add_balance( name owner, asset value, name ram_payer );
+        
       public:
          struct transfer_args {
-            account_name  from;
-            account_name  to;
+            name  from;
+            name  to;
             asset         quantity;
             string        memo;
          };
    };
 
-   asset token::get_supply( symbol_name sym )const
+   asset token::get_supply( symbol sym )const
    {
-      stats statstable( _self, sym );
-      const auto& st = statstable.get( sym );
+      stats statstable( get_self(), sym.code().raw() );
+      const auto& st = statstable.get( sym.code().raw() );
       return st.supply;
    }
 
-   asset token::get_balance( account_name owner, symbol_name sym )const
+   asset token::get_balance( name owner, symbol sym )const
    {
-      accounts accountstable( _self, owner );
-      const auto& ac = accountstable.get( sym );
+      accounts accountstable( get_self(), owner.value );
+      const auto& ac = accountstable.get( sym.code.raw() );
       return ac.balance;
    }
 
-} /// namespace eosio
+   void token::apply(uint64_t receiver, uint64_t code, uint64_t action) {
+      auto &thiscontract = *this;
+      if (action == ( "transfer"_n ).value && code == ( "eosio.token"_n ).value ) {
+            auto transfer_data = unpack_action_data<st_transfer>();
+            onTransfer(transfer_data.from, transfer_data.to, transfer_data.quantity, transfer_data.memo);
+            return;
+      }
+
+      if (code != get_self().value) return;
+      switch (action) {
+            EOSIO_DISPATCH_HELPER(cryptojinian,
+                  (create)(issue)(transfer)(init)
+            )
+      }
+   }
+}; /// namespace eosio
+
+extern "C" {
+    [[noreturn]] void apply(uint64_t receiver, uint64_t code, uint64_t action) {
+        eosio::token p( name(receiver), name(code), datastream<const char*>(nullptr, 0) );
+        p.apply(receiver, code, action);
+        eosio_exit(0);
+    }
+}
