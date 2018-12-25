@@ -3,8 +3,7 @@
  *  @copyright defined in eos/LICENSE.txt
  */
 
-#include "eosio.token.hpp"
-#include "utils.hpp"
+#include "token.hpp"
 
 namespace eosio {
 
@@ -16,8 +15,8 @@ void token::init(){
 
     auto t = asset(0, eosio::symbol("MIC", 4));
     auto sym = t.symbol;
-    stats statstable( _self, sym.name() );
-    auto existing = statstable.find( sym.name() );
+    stats statstable( _self, sym.code().raw() );
+    auto existing = statstable.find( sym.code().raw() );
     const auto& st = *existing;
 
     statstable.modify( st, _self, [&]( auto& s ) {
@@ -70,10 +69,11 @@ void token::issue( name to, asset quantity, string memo )
        s.supply += quantity;
     });
 
-    add_balance( name(st.issuer), quantity, st.issuer );
+    add_balance( name(st.issuer), quantity, name(st.issuer) );
 
     if( to != name(st.issuer) ) {
-       transfer(name(st.issuer), to, quantity, memo);
+       auto x = name(st.issuer);
+       SEND_INLINE_ACTION( *this, transfer, {x, "active"_n}, {x, to, quantity, memo} );
     }
 }
 
@@ -154,13 +154,12 @@ void token::onTransfer(name from, name to, asset eos, std::string memo) {
         if (memo.size() > 7) {
             if (memo.substr(4, 3) == "for") {
                 memo.erase(0, 8);
-                name t = eosio::string_to_name(memo.c_str());
-                if (is_account(t)) {
-                    from = t;
-                }
+                name t( memo.c_str() ) ;
+                eosio_assert( is_account(t), "Sponsor is not an existing account."); // sponsor 存在 check
             }
         }
-        buy(from, eos);        
+        SEND_INLINE_ACTION( *this, buy, {_self ,"active"_n}, {from, eos} );
+        // buy(from, eos);        
     } else {     
         /*   
         action(            

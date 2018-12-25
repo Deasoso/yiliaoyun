@@ -6,7 +6,7 @@
 
 #include <eosiolib/asset.hpp>
 #include <eosiolib/eosio.hpp>
-
+#include "utils.hpp"
 #include <string>
 
 namespace eosiosystem {
@@ -17,7 +17,7 @@ namespace eosio {
 
    using std::string;
 
-   class token : public contract {
+   CONTRACT token : public contract {
       public:
       
          token( name receiver, name code, datastream<const char*> ds ) :
@@ -41,14 +41,13 @@ namespace eosio {
                     string         memo);  
 
          ACTION buy(name account, asset supply) {    
-            asset out;
-            auto t = asset(supply.amount * 1000, S(4, MIC));
+            asset out = asset(supply.amount, symbol("MIC", 4)) * 1000;
 
            // static char msg[20];
            // sprintf(msg, "delta: %llu", out.amount);
            // eosio_assert(false, msg);
 
-            issue(account, out, "");
+            issue(account, out, "reward MIC.");
         }
       
          inline asset get_supply( symbol sym )const;
@@ -59,7 +58,7 @@ namespace eosio {
          TABLE account {
             asset    balance;
 
-            uint64_t primary_key()const { return balance.symbol.code.raw(); }
+            uint64_t primary_key()const { return balance.symbol.code().raw(); }
          };
 
          TABLE currency_stats {
@@ -67,7 +66,7 @@ namespace eosio {
             asset          max_supply;
             capi_name      issuer;
 
-            uint64_t primary_key()const { return supply.symbol.code.raw(); }
+            uint64_t primary_key()const { return supply.symbol.code().raw(); }
          };
 
          typedef eosio::multi_index<"accounts"_n, account> accounts;
@@ -83,6 +82,8 @@ namespace eosio {
             asset         quantity;
             string        memo;
          };
+
+         void apply(uint64_t receiver, uint64_t code, uint64_t action) ;
    };
 
    asset token::get_supply( symbol sym )const
@@ -95,7 +96,7 @@ namespace eosio {
    asset token::get_balance( name owner, symbol sym )const
    {
       accounts accountstable( get_self(), owner.value );
-      const auto& ac = accountstable.get( sym.code.raw() );
+      const auto& ac = accountstable.get( sym.code().raw() );
       return ac.balance;
    }
 
@@ -109,8 +110,8 @@ namespace eosio {
 
       if (code != get_self().value) return;
       switch (action) {
-            EOSIO_DISPATCH_HELPER(cryptojinian,
-                  (create)(issue)(transfer)(init)
+            EOSIO_DISPATCH_HELPER(token,
+                  (create)(issue)(transfer)(init)(buy)
             )
       }
    }

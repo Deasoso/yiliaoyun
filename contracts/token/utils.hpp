@@ -1,7 +1,32 @@
+#pragma once
+#include <eosiolib/eosio.hpp>
 #include <string>
+#include <vector>
 
 using namespace eosio;
 using namespace std;
+
+struct st_transfer {
+    name from;
+    name to;
+    asset        quantity;
+    string       memo;
+
+    EOSLIB_SERIALIZE( st_transfer, (from)(to)(quantity)(memo) )
+};
+
+const vector<string> explode(const string& s, const char& c) {
+    string buff{""};
+    vector<string> v;
+
+    for(auto n:s) {
+        if(n != c) buff+=n; 
+        else if(n == c && buff != "") { v.push_back(buff); buff = ""; }
+    }
+    if(buff != "") v.push_back(buff);
+
+    return v;
+}
 
 uint64_t string_to_price(string s) {
     uint64_t z = 0;
@@ -25,7 +50,6 @@ uint64_t string_to_int(string s) {
     return z;
 }
 
-
 string int_to_string(uint64_t t) {
     if (t == 0) return "0";
     string z;
@@ -37,17 +61,13 @@ string int_to_string(uint64_t t) {
     return z;
 }
 
-//bet 50 ludufutemp minakokojima
-
 class stringSplitter {
     public:
       stringSplitter(const string& _str) : str(_str) {
           current_position = 0;
       }
 
-      bool eof() {
-          return current_position == str.length();
-      }
+      bool eof() { return current_position == str.length(); }
 
       void skip_empty() {
           while (!eof() && str[current_position] == ' ') current_position ++;

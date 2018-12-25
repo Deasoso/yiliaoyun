@@ -3,6 +3,15 @@
         "initializer_list": "cpp",
         "iterator": "cpp",
         "string": "cpp",
-        "string_view": "cpp"
+        "string_view": "cpp",
+        "__functional_base": "cpp",
+        "algorithm": "cpp",
+        "atomic": "cpp",
+        "limits": "cpp",
+        "memory": "cpp",
+        "tuple": "cpp",
+        "type_traits": "cpp",
+        "stdexcept": "cpp",
+        "typeinfo": "cpp"
     }
 }
